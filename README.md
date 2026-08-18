@@ -142,3 +142,8 @@ flutter run
 ## License
 
 Released under the MIT License — see the [LICENSE](LICENSE) file.
+
+---
+
+*This app was built with the assistance of an AI coding assistant. All design
+decisions and final review are the author's.*
