@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'kef_speaker.dart';
 
 const String _kIpKey = 'speaker_ip';
+const String _kScanPromptedKey = 'scan_prompted'; // shown once after install
 const String _kDefaultIp = '192.168.0.143';
 const String _kDefaultVolumeKey = 'default_volume'; // 0..100
 const int _kDefaultVolume = 50;
@@ -91,15 +92,14 @@ class _MyHomePageState extends State<MyHomePage> {
     await _loadIp();
     await _loadDefaultVolume();
     await _loadDefaultSource();
-    // If no IP has ever been saved, suggest scanning on startup. We only
-    // prompt when the stored value is still the built-in default, which
-    // means the user hasn't configured anything yet.
+    // Show the scan prompt only once, on first launch after install. We
+    // track this with a dedicated flag so it never reappears — even if the
+    // user dismisses it or leaves the IP at the built-in default.
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_kIpKey);
-    final bool neverConfigured =
-        saved == null || saved.trim().isEmpty || saved.trim() == _kDefaultIp;
-    if (neverConfigured && mounted) {
+    final bool scanPrompted = prefs.getBool(_kScanPromptedKey) ?? false;
+    if (!scanPrompted && mounted) {
       await _suggestScanOnStartup();
+      await prefs.setBool(_kScanPromptedKey, true);
     }
     await _refreshState(); // query the real state instead of starting as Unknown
     setState(() => _ready = true); // reveal the toggle only after startup
@@ -133,7 +133,9 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
     if (confirmed == true) {
-      await _scanForSpeaker();
+      // The startup dialog already explains the scanning warning, so skip
+      // the redundant confirmation that _scanForSpeaker shows by default.
+      await _scanForSpeaker(confirm: false);
     }
   }
 
@@ -183,31 +185,37 @@ class _MyHomePageState extends State<MyHomePage> {
   /// Scans the local subnet for a KEF speaker and, if found, saves its IP.
   /// Shows a warning first because port scanning can trip security systems
   /// on networks you don't own. Returns the discovered IP, or `null`.
-  Future<String?> _scanForSpeaker() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Scan for speaker?'),
-        content: const Text(
-          'This will check every device on your local network (subnet scan) '
-          'to find the speaker. Only use this on a network you own or control.\n\n'
-          'Do NOT run it on corporate, public, or shared networks — port '
-          'scanning can trigger intrusion-detection systems or other security '
-          'devices that may react to the scan.',
+  ///
+  /// When [confirm] is true (the default) a confirmation dialog is shown
+  /// first; pass false to scan immediately (e.g. when a prior dialog has
+  /// already explained the warning).
+  Future<String?> _scanForSpeaker({bool confirm = true}) async {
+    if (confirm) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Scan for speaker?'),
+          content: const Text(
+            'This will check every device on your local network (subnet scan) '
+            'to find the speaker. Only use this on a network you own or control.\n\n'
+            'Do NOT run it on corporate, public, or shared networks — port '
+            'scanning can trigger intrusion-detection systems or other security '
+            'devices that may react to the scan.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Scan'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Scan'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return null;
+      );
+      if (confirmed != true) return null;
+    }
 
     setState(() => _scanning = true);
     try {
