@@ -6,6 +6,8 @@ you can:
 
 - Turn the speaker **On** (and switch it to your chosen input)
 - Turn it **Off** (standby)
+- **Choose the input source** — Optical, Aux, or Bluetooth — applied each time
+  the speaker is turned on
 - See whether it is currently on/off
 - Adjust the **volume** with a slider
 
@@ -25,6 +27,11 @@ speakers, the KEF still shows up as a castable device in music apps and
 confuses the source picker. To keep it out of the way I renamed the speaker to
 **"do not use"** in the KEF app — a small trick so it doesn't clutter the list
 of real playback targets.
+
+In my own setup I pair the LSX with a **WiiM mini** streamer connected over
+**Optical**. I set the default source to Optical and the default volume to
+**75**, which has turned out to be a good starting level for that combination —
+the WiiM then handles the actual playback and volume.
 
 > **Disclaimer:** This project is not affiliated with, endorsed by, or
 > sponsored by KEF. "KEF" and "LSX" are trademarks of their respective owner.
