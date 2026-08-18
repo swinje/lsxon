@@ -130,6 +130,11 @@ flutter pub get
 flutter run
 ```
 
+Being a Flutter app, it can also be compiled for Android. I currently use an
+iPhone, so the Android build has **not** been tested — it should work in
+principle, but you may run into platform-specific issues (e.g. the Local
+Network permission only applies to iOS).
+
 ## Known issues
 
 - **Delay when turning on/off.** The LSX takes a few seconds to actually power
