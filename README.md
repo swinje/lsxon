@@ -1,7 +1,8 @@
 # LSX On
 
-A simple Flutter app to control your KEF LSX speakers over the local network.
-Enter the speaker's IP address (default `192.168.0.143`) and you can:
+A simple Flutter app to control your **KEF LSX (1st generation)** speakers over
+the local network. Enter the speaker's IP address (default `192.168.0.143`) and
+you can:
 
 - Turn the speaker **On** (and switch it to your chosen input)
 - Turn it **Off** (standby)
@@ -9,6 +10,21 @@ Enter the speaker's IP address (default `192.168.0.143`) and you can:
 - Adjust the **volume** with a slider
 
 The protocol is based on the reverse-engineered KEF network commands.
+
+## Why this app exists
+
+This app is a **workaround**. The built-in Wi-Fi in the LSX Gen 1 speakers
+gave me constant connectivity problems, so I switched to using an external
+streamer instead. The catch is that the speakers still need to be *woken up*
+over the network before they'll play — which is exactly what this app does:
+tap once to power the speaker on and select the input, then your streamer
+takes over.
+
+Because Wi-Fi has to stay enabled for the wake-up command to reach the
+speakers, the KEF still shows up as a castable device in music apps and
+confuses the source picker. To keep it out of the way I renamed the speaker to
+**"do not use"** in the KEF app — a small trick so it doesn't clutter the list
+of real playback targets.
 
 > **Disclaimer:** This project is not affiliated with, endorsed by, or
 > sponsored by KEF. "KEF" and "LSX" are trademarks of their respective owner.
