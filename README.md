@@ -130,6 +130,15 @@ flutter pub get
 flutter run
 ```
 
+## Known issues
+
+- **Delay when turning on/off.** The LSX takes a few seconds to actually power
+  up or enter standby after the command is sent, so the on/off state in the app
+  may lag behind the speaker for a moment. If the button ever gets out of sync
+  with the real state (e.g. you tap it but nothing appears to happen), just tap
+  it again — the app re-queries the speaker and will eventually get back in
+  sync after a repeat.
+
 ## License
 
 Released under the MIT License — see the [LICENSE](LICENSE) file.
