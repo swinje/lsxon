@@ -11,6 +11,9 @@ const String _kIpKey = 'speaker_ip';
 const String _kDefaultIp = '192.168.0.143';
 const String _kDefaultVolumeKey = 'default_volume'; // 0..100
 const int _kDefaultVolume = 50;
+const String _kDefaultSourceKey =
+    'default_source'; // 'optical'|'aux'|'bluetooth'
+const Source _kDefaultSource = Source.optical;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,6 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool? _isOn;
   double? _volume;
   int _defaultVolume = _kDefaultVolume;
+  Source _defaultSource = _kDefaultSource;
 
   KefSpeaker _speaker() =>
       KefSpeaker(host: _ipController.text.trim(), debug: false);
@@ -85,6 +89,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _init() async {
     await _loadIp();
     await _loadDefaultVolume();
+    await _loadDefaultSource();
     await _refreshState(); // query the real state instead of starting as Unknown
     setState(() => _ready = true); // reveal the toggle only after startup
   }
@@ -113,6 +118,25 @@ class _MyHomePageState extends State<MyHomePage> {
     await prefs.setInt(_kDefaultVolumeKey, clamped);
   }
 
+  Future<void> _loadDefaultSource() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_kDefaultSourceKey);
+    Source source = _kDefaultSource;
+    if (saved != null) {
+      source = Source.values.firstWhere(
+        (s) => s.name == saved,
+        orElse: () => _kDefaultSource,
+      );
+    }
+    setState(() => _defaultSource = source);
+  }
+
+  Future<void> _saveDefaultSource(Source source) async {
+    setState(() => _defaultSource = source);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kDefaultSourceKey, source.name);
+  }
+
   Future<void> _saveIp() async {
     // Clear stale status when the IP is edited.
     if (_isOn != null || _volume != null) {
@@ -135,7 +159,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _busy = true;
       _status = 'Connecting to $host…';
     });
-    final ok = await _speaker().turnOnOptical();
+    final ok = await _speaker().turnOn(_defaultSource);
     if (ok) {
       // Apply the user's default volume once the speaker is on.
       await _speaker().setVolume(_defaultVolume / 100.0);
@@ -149,7 +173,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _isOn = ok ? true : _isOn;
       _volume = ok ? _defaultVolume / 100.0 : _volume;
       _status = ok
-          ? 'Speaker is on, Optical selected.'
+          ? 'Speaker is on, ${_defaultSource.label} selected.'
           : 'Failed — check IP/network.';
     });
   }
@@ -159,7 +183,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _busy = true;
       _status = 'Turning off…';
     });
-    final ok = await _speaker().turnOff();
+    final ok = await _speaker().turnOff(_defaultSource);
     // NOTE: on the LSX, register 48 keeps reporting the same value (43) even
     // after the speaker enters standby, so `isOn()` cannot detect "off".
     // Trust the command result instead of re-querying, otherwise the UI
@@ -254,6 +278,27 @@ class _MyHomePageState extends State<MyHomePage> {
                       hintText: '50',
                     ),
                     onChanged: (_) => _saveDefaultVolume(),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<Source>(
+                    initialValue: _defaultSource,
+                    decoration: const InputDecoration(
+                      labelText: 'Default source when turned on',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      for (final source in Source.values)
+                        DropdownMenuItem<Source>(
+                          value: source,
+                          child: Text(source.label),
+                        ),
+                    ],
+                    onChanged: (source) {
+                      if (source != null) {
+                        _saveDefaultSource(source);
+                        setDialogState(() {});
+                      }
+                    },
                   ),
                 ],
               ),

@@ -16,16 +16,12 @@ class KefSpeaker {
     if (debug) print('[KefSpeaker $host] $msg');
   }
 
-  /// Turns the speaker on (if off) and switches it to Optical input.
+  /// Turns the speaker on (if off) and switches it to the given [source].
   /// Works whether the speaker is currently on or off/standby.
-  Future<bool> turnOnOptical({int retries = 3}) async {
-    // Opt = 11, "never standby" offset = 32, L/R (non-inverted) = +0
-    const int opticalNeverStandbyCode = 43;
-    return _sendSetCommand(
-      register: 48,
-      value: opticalNeverStandbyCode,
-      retries: retries,
-    );
+  Future<bool> turnOn(Source source, {int retries = 3}) async {
+    // Source code + "never standby" offset (32) + L/R (non-inverted) = +0.
+    final int code = source.code + StandbyTime.never.offset;
+    return _sendSetCommand(register: 48, value: code, retries: retries);
   }
 
   /// Generic "set source" command builder, in case you want other
@@ -41,11 +37,12 @@ class KefSpeaker {
     return _sendSetCommand(register: 48, value: code, retries: 3);
   }
 
-  /// Turns the speaker off (standby) while keeping the current source.
+  /// Turns the speaker off (standby) while keeping the given [source].
   /// Mirrors the Python lib's `turn_off` (adds 128 to the source code).
-  Future<bool> turnOff({int retries = 3}) async {
-    // Optical "never standby" code is 43; +128 puts the speaker in standby.
-    const int offCode = 43 + 128;
+  Future<bool> turnOff(Source source, {int retries = 3}) async {
+    // Source code + "never standby" offset (32) + 128 puts the speaker in
+    // standby while preserving the source for the next power-on.
+    final int offCode = source.code + StandbyTime.never.offset + 128;
     return _sendSetCommand(register: 48, value: offCode, retries: retries);
   }
 
@@ -208,4 +205,28 @@ enum StandbyTime {
 
   final int offset;
   const StandbyTime(this.offset);
+}
+
+/// The selectable KEF input sources. The numeric [code] is the lower 7 bits
+/// of register 48's value (the power bit is 128, the inverted bit is 64).
+/// Values match aiokef's `INPUT_SOURCES_20_MINUTES_LR` mapping.
+enum Source {
+  optical(11),
+  aux(10),
+  bluetooth(9);
+
+  final int code;
+  const Source(this.code);
+
+  /// Human-readable label for the UI.
+  String get label {
+    switch (this) {
+      case Source.optical:
+        return 'Optical';
+      case Source.aux:
+        return 'Aux';
+      case Source.bluetooth:
+        return 'Bluetooth';
+    }
+  }
 }

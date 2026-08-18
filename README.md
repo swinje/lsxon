@@ -3,12 +3,16 @@
 A simple Flutter app to control your KEF LSX speakers over the local network.
 Enter the speaker's IP address (default `192.168.0.143`) and you can:
 
-- Turn the speaker **On** (and switch it to the Optical input)
+- Turn the speaker **On** (and switch it to your chosen input)
 - Turn it **Off** (standby)
 - See whether it is currently on/off
 - Adjust the **volume** with a slider
 
 The protocol is based on the reverse-engineered KEF network commands.
+
+> **Disclaimer:** This project is not affiliated with, endorsed by, or
+> sponsored by KEF. "KEF" and "LSX" are trademarks of their respective owner.
+> All product names are used descriptively to indicate device compatibility.
 
 ## Acknowledgements
 
@@ -31,6 +35,34 @@ KEF network protocol:
 Source is controlled via register `48` and volume via register `37`. On the
 LSX, the `128` bit of the source register is the standby bit: `value <= 128`
 means the speaker is on, `value >= 128` means it is in standby.
+
+The input source is selected by the lower 7 bits of register `48`. The codes
+match [aiokef](https://github.com/basnijholt/aiokef)'s
+`INPUT_SOURCES_20_MINUTES_LR` mapping:
+
+| Input     | Code |
+|-----------|------|
+| Optical   | 11   |
+| Aux       | 10   |
+| Bluetooth | 9    |
+
+The app adds the "never standby" offset (`32`) when turning on and the power
+bit (`128`) when turning off, preserving the selected source.
+
+## Settings
+
+Open **Advanced settings** from the top-right menu (⋮) to configure:
+
+- **Speaker IP address** — the address used to reach the speaker (default
+  `192.168.0.143`). Saved as you type.
+- **Default volume (0–100)** — applied automatically whenever the speaker is
+  turned on. Saved as you type.
+- **Default source when turned on** — choose **Optical**, **Aux**, or
+  **Bluetooth**. This input is selected each time the speaker is switched on.
+  Defaults to **Optical** if not set, and is saved immediately when you pick it.
+
+All settings are persisted on the device via `shared_preferences` and restored
+on the next launch.
 
 ## Requirements
 
