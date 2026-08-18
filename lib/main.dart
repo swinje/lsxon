@@ -60,6 +60,7 @@ class _MyHomePageState extends State<MyHomePage> {
   double? _volume;
   int _defaultVolume = _kDefaultVolume;
   Source _defaultSource = _kDefaultSource;
+  bool _scanning = false;
 
   KefSpeaker _speaker() =>
       KefSpeaker(host: _ipController.text.trim(), debug: false);
@@ -90,8 +91,50 @@ class _MyHomePageState extends State<MyHomePage> {
     await _loadIp();
     await _loadDefaultVolume();
     await _loadDefaultSource();
+    // If no IP has ever been saved, suggest scanning on startup. We only
+    // prompt when the stored value is still the built-in default, which
+    // means the user hasn't configured anything yet.
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_kIpKey);
+    final bool neverConfigured =
+        saved == null || saved.trim().isEmpty || saved.trim() == _kDefaultIp;
+    if (neverConfigured && mounted) {
+      await _suggestScanOnStartup();
+    }
     await _refreshState(); // query the real state instead of starting as Unknown
     setState(() => _ready = true); // reveal the toggle only after startup
+  }
+
+  /// On first launch (no saved IP), offer to scan for the speaker. The user
+  /// can scan or just dismiss and enter the IP manually in Advanced settings.
+  Future<void> _suggestScanOnStartup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Find your speaker?'),
+        content: const Text(
+          'No speaker IP is configured yet. You can scan your local network '
+          'to find it automatically, or set the IP manually later in '
+          'Advanced settings.\n\n'
+          'Scanning checks every device on your network. Only do this on a '
+          'network you own or control — not on corporate, public, or shared '
+          'networks, where port scanning may trigger security systems.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Enter manually'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Scan'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _scanForSpeaker();
+    }
   }
 
   Future<void> _loadIp() async {
@@ -135,6 +178,51 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() => _defaultSource = source);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kDefaultSourceKey, source.name);
+  }
+
+  /// Scans the local subnet for a KEF speaker and, if found, saves its IP.
+  /// Shows a warning first because port scanning can trip security systems
+  /// on networks you don't own. Returns the discovered IP, or `null`.
+  Future<String?> _scanForSpeaker() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Scan for speaker?'),
+        content: const Text(
+          'This will check every device on your local network (subnet scan) '
+          'to find the speaker. Only use this on a network you own or control.\n\n'
+          'Do NOT run it on corporate, public, or shared networks — port '
+          'scanning can trigger intrusion-detection systems or other security '
+          'devices that may react to the scan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Scan'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return null;
+
+    setState(() => _scanning = true);
+    try {
+      final ip = await KefSpeaker.discover();
+      if (ip != null) {
+        _ipController.text = ip;
+        await _saveIp();
+        setState(() => _status = 'Found speaker at $ip.');
+      } else {
+        setState(() => _status = 'No speaker found on this network.');
+      }
+      return ip;
+    } finally {
+      setState(() => _scanning = false);
+    }
   }
 
   Future<void> _saveIp() async {
@@ -299,6 +387,25 @@ class _MyHomePageState extends State<MyHomePage> {
                         setDialogState(() {});
                       }
                     },
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _scanning
+                        ? null
+                        : () async {
+                            setDialogState(() => saving = true);
+                            await _scanForSpeaker();
+                            if (!mounted) return;
+                            setDialogState(() => saving = false);
+                          },
+                    icon: _scanning
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.search),
+                    label: Text(_scanning ? 'Scanning…' : 'Scan for speaker'),
                   ),
                 ],
               ),

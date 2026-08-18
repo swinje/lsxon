@@ -87,6 +87,35 @@ Open **Advanced settings** from the top-right menu (⋮) to configure:
 All settings are persisted on the device via `shared_preferences` and restored
 on the next launch.
 
+## Finding your speaker's IP
+
+The app needs the speaker's IP address on your local network. A few ways to
+find it:
+
+- **Router admin page / app** — look in the DHCP client list for a device
+  named "KEF LSX" or a MAC vendor of "KEF".
+- **KEF Connect app** — its settings/about screen usually shows the assigned
+  IP.
+- **`arp -a`** on a computer after the speaker has been awake — the IP appears
+  next to the KEF MAC address.
+- **Static DHCP reservation** — pin the speaker to a fixed IP in your router so
+  it never changes; then you set it once in the app. (The `192.168.0.143`
+  default assumes your router already hands that out consistently.)
+
+### Automatic scan
+
+The app can also find the speaker for you:
+
+- **On first launch** (no IP configured yet) it offers to scan the network.
+- **In Advanced settings** there is a **Scan for speaker** button.
+
+Scanning works by probing every device on your local subnet (a /24) on port
+`50001` and keeping the first one that answers like a KEF speaker. Because this
+is a port scan, **only run it on a network you own or control**. Do **not** use
+it on corporate, public, or shared networks — port scanning can trigger
+intrusion-detection / intrusion-prevention systems or other security devices
+that may react to the scan. The app shows this warning before scanning.
+
 ## Requirements
 
 - An iOS device on the same local network as the KEF LSX speakers.

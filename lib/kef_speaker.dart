@@ -46,6 +46,91 @@ class KefSpeaker {
     return _sendSetCommand(register: 48, value: offCode, retries: retries);
   }
 
+  /// Scans the local /24 subnet for a KEF speaker listening on [port] and
+  /// returns the first reachable speaker's IP, or `null` if none is found.
+  ///
+  /// This opens a TCP connection to every host on the subnet, so it should
+  /// only be used on a network you own or control. Port scanning can trip
+  /// intrusion-detection / intrusion-prevention systems on corporate or
+  /// shared networks.
+  static Future<String?> discover({int port = 50001, Duration? timeout}) async {
+    final Duration t = timeout ?? const Duration(milliseconds: 400);
+    String? localIp;
+    try {
+      final interfaces = await NetworkInterface.list(
+        includeLoopback: false,
+        type: InternetAddressType.IPv4,
+      );
+      for (final iface in interfaces) {
+        for (final addr in iface.addresses) {
+          final ip = addr.address;
+          // Skip link-local (169.254.x.x) addresses.
+          if (ip.contains('.') && !ip.startsWith('169.254')) {
+            localIp = ip;
+            break;
+          }
+        }
+        if (localIp != null) break;
+      }
+    } catch (_) {
+      return null;
+    }
+    if (localIp == null) return null;
+
+    // Assume a /24 subnet (the common case for home networks).
+    final base = localIp.substring(0, localIp.lastIndexOf('.') + 1);
+    final completer = Completer<String?>();
+    var pending = 254;
+    var settled = false;
+    void finish(String? ip) {
+      if (!settled) {
+        settled = true;
+        completer.complete(ip);
+      }
+    }
+
+    for (int i = 1; i <= 254; i++) {
+      final ip = '$base$i';
+      _probe(ip, port, t).then((found) {
+        if (found != null) {
+          finish(found);
+        } else {
+          pending--;
+          if (pending == 0) finish(null);
+        }
+      });
+    }
+    return completer.future;
+  }
+
+  /// Probes a single host. Returns its IP if it answers like a KEF speaker
+  /// (replies to a source GET with an 'R' segment), otherwise `null`.
+  static Future<String?> _probe(String ip, int port, Duration timeout) async {
+    try {
+      final socket = await Socket.connect(ip, port, timeout: timeout);
+      final received = <int>[];
+      final completer = Completer<List<int>>();
+      socket.listen(
+        (data) => received.addAll(data),
+        onDone: () => completer.complete(received),
+        onError: (e) => completer.completeError(e),
+        cancelOnError: true,
+      );
+      socket.add([0x47, 48, 0x80]); // GET register 48
+      await socket.flush();
+      final reply = await completer.future.timeout(
+        timeout,
+        onTimeout: () => received,
+      );
+      await socket.close();
+      // A KEF speaker replies with an 'R' (82) segment.
+      if (reply.contains(82)) return ip;
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
   /// Returns whether the speaker is currently powered on.
   /// Returns `null` if the query could not be completed (speaker booting or
   /// unreachable), so callers can avoid overwriting a known state with a
